@@ -117,6 +117,7 @@ class InvoiceGenerator():
         return info
 
     def build_items(self):
+        pass
 
 
 
