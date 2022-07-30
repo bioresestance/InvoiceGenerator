@@ -1,4 +1,5 @@
 # Borb imports
+from xmlrpc.client import DateTime
 from borb.pdf.document.document import Document
 from borb.pdf.page.page import Page
 from borb.pdf.canvas.layout.page_layout.multi_column_layout import SingleColumnLayout
@@ -12,7 +13,7 @@ from borb.pdf.canvas.color.color import HexColor, X11Color
 from borb.pdf.canvas.layout.table.table import TableCell
 
 # General imports
-from datetime import datetime
+from datetime import datetime, timedelta
 from dataclasses import dataclass
 from typing import List
 
@@ -22,7 +23,7 @@ from argparse import ArgumentParser
 
 # local module imports
 from billable_item import BillableItem
-from client import Client
+from client import Client, ClientInfo
 from company import Company
 
 
@@ -39,10 +40,22 @@ Class that generates a PDF invoice from provided data.
 '''
 class InvoiceGenerator():
 
-    def __init__(self, company:Company, client:Client):
+    def __init__(self, 
+        company:Company, 
+        client:Client, 
+        invoice_number:int = 1, 
+        invoice_date:DateTime = datetime.now(), 
+        invoice_due_period=7, 
+        tax_rate_percent=5
+    ):
 
+        # Save parameters
         self.company = company
         self.client = client
+        self.invoice_number = invoice_number
+        self.invoice_date = invoice_date
+        self.invoice_due_date:datetime = self.invoice_date + timedelta(days=invoice_due_period)
+        self.tax_rate = tax_rate_percent
 
         # Base Document 
         self.doc = Document()
@@ -54,22 +67,32 @@ class InvoiceGenerator():
         # Fit all content into a single column
         self.layout = SingleColumnLayout(self.page, vertical_margin = (self.page.get_page_info().get_height() * Decimal(0.02)) )
 
+
+
     # Appends an image to the document.
     def add_image(self, image_path:str, width=Decimal(128), height=Decimal(128)):
         self.layout.add(Image( image_path, width=width, height=height))
+
+
 
     # Appends a table to the document.
     def add_table(self, table: Table):
         self.layout.add(table)
 
+
+
     # Appends a blank line to the document
     def add_blank_line(self):
         self.layout.add(Paragraph(" "))
+
+
 
     # Generates the file at the given file name/path
     def generate(self, file_name:str):
         with open(file_name, "wb") as pdf_file_handle:
             PDF.dumps(pdf_file_handle, self.doc)
+
+
 
     # Builds a table with the header information. Does not modify the document.
     def build_header(self) -> Table:
@@ -78,16 +101,15 @@ class InvoiceGenerator():
 	
         header.add(Paragraph(f"{self.company.name}"))    
         header.add(Paragraph("Date:        ", font="Helvetica-Bold",respect_spaces_in_text=True,  horizontal_alignment=Alignment.RIGHT))    
-        now = datetime.now()    
-        header.add(Paragraph("%d/%d/%d" % (now.day, now.month, now.year)))
+        header.add(Paragraph(f"{self.invoice_date:%d-%m-%Y}"))
         
         header.add(Paragraph(f"{self.company.address}"))    
         header.add(Paragraph("Invoice #:", font="Helvetica-Bold", horizontal_alignment=Alignment.RIGHT))
-        header.add(Paragraph("%d" % 1))   
+        header.add(Paragraph(f"{self.invoice_number}"))   
         
         header.add(Paragraph(f"{self.company.phone}"))    
         header.add(Paragraph("Due Date:", font="Helvetica-Bold", horizontal_alignment=Alignment.RIGHT))
-        header.add(Paragraph("%d/%d/%d" % (now.day, now.month, now.year))) 
+        header.add(Paragraph(f"{self.invoice_due_date:%d-%m-%Y}")) 
         
         header.add(Paragraph(f"{self.company.email}"))    
         header.add(Paragraph(" "))
@@ -101,42 +123,47 @@ class InvoiceGenerator():
         header.no_borders()
         return header
 
+
+
+    # Builds the table containing the client shipping and billing information
     def build_billing_shipping(self):
         info = Table(number_of_rows=6, number_of_columns=2)  
-        info.add(  
-            Paragraph(  
-                "BILL TO",  
-                background_color=HexColor("263238"),  
-                font_color=X11Color("White"), 
-                padding_bottom=Decimal(4) 
-            )  
-        )  
-        info.add(  
-            Paragraph(  
-                "SHIP TO",  
-                background_color=HexColor("263238"),  
-                font_color=X11Color("White"),  
-                padding_bottom=Decimal(4)
-            )  
-        )  
-        info.add(Paragraph("[Recipient Name]"))        # BILLING  
-        info.add(Paragraph("[Recipient Name]"))        # SHIPPING  
-        info.add(Paragraph("[Company Name]"))          # BILLING  
-        info.add(Paragraph("[Company Name]"))          # SHIPPING  
-        info.add(Paragraph("[Street Address]"))        # BILLING  
-        info.add(Paragraph("[Street Address]"))        # SHIPPING  
-        info.add(Paragraph("[City, State, ZIP Code]")) # BILLING  
-        info.add(Paragraph("[City, State, ZIP Code]")) # SHIPPING  
-        info.add(Paragraph("[Phone]"))                 # BILLING  
-        info.add(Paragraph("[Phone]"))                 # SHIPPING  
-        info.set_padding_on_all_cells(Decimal(2), Decimal(2), Decimal(2), Decimal(2))  
+        # Headers
+        info.add( Paragraph( "BILL TO", background_color=TOP_ROW_TABLE_COLOR, font_color=X11Color("White")))    
+        info.add( Paragraph( "SHIP TO", background_color=TOP_ROW_TABLE_COLOR, font_color=X11Color("White")))  
+
+        # Recipient Name
+        info.add(Paragraph(f"{self.client.billing_info.recipient}"))              # BILLING  
+        info.add(Paragraph(f"{self.client.shipping_info.recipient}"))             # SHIPPING 
+
+        # Company Name 
+        info.add(Paragraph(f"{self.client.billing_info.company_name}"))           # BILLING  
+        info.add(Paragraph(f"{self.client.shipping_info.company_name}"))          # SHIPPING  
+
+        # Street Address
+        info.add(Paragraph(f"{self.client.billing_info.street_address}"))         # BILLING  
+        info.add(Paragraph(f"{self.client.shipping_info.street_address}"))        # SHIPPING  
+
+        # Rest of the adress
+        info.add(Paragraph(f"{self.client.billing_info.city_province_areacode}")) # BILLING  
+        info.add(Paragraph(f"{self.client.shipping_info.city_province_areacode}"))# SHIPPING 
+
+        # Phone number 
+        info.add(Paragraph(f"{self.client.billing_info.phone}"))                  # BILLING  
+        info.add(Paragraph(f"{self.client.shipping_info.phone}"))                 # SHIPPING  
+
+        # Formating
+        info.set_padding_on_all_cells(Decimal(2), Decimal(2), Decimal(4), Decimal(2))  
         info.no_borders()  
         return info
+
+
 
     # Builds the table of billable items.
     def build_items(self, items_to_bill: List[BillableItem]):
         
-        sub_total = 0
+        sub_total = 0.0
+        tax_amount = 0.0
         item_table = Table(number_of_rows=14, number_of_columns=4)  
         
         # Builds the Table header. Dark Background with white text.
@@ -174,12 +201,13 @@ class InvoiceGenerator():
         item_table.add(TableCell(Paragraph(f"${sub_total:.2f}", horizontal_alignment=Alignment.RIGHT),  col_span=1))
 
         # Taxes
-        item_table.add(TableCell(Paragraph("GST (5%)", horizontal_alignment=Alignment.RIGHT),  col_span=3))
-        item_table.add(TableCell(Paragraph(f"${(sub_total * 0.05):.2f}", horizontal_alignment=Alignment.RIGHT),  col_span=1))
+        tax_amount = (sub_total * (self.tax_rate / 100))
+        item_table.add(TableCell(Paragraph(f"GST ({self.tax_rate}%)", horizontal_alignment=Alignment.RIGHT),  col_span=3))
+        item_table.add(TableCell(Paragraph(f"${(tax_amount):.2f}", horizontal_alignment=Alignment.RIGHT),  col_span=1))
 
         # Total
         item_table.add(TableCell(Paragraph("Total", horizontal_alignment=Alignment.RIGHT),  col_span=3))
-        item_table.add(TableCell(Paragraph(f"${ ((sub_total * 0.05) + sub_total):.2f}", horizontal_alignment=Alignment.RIGHT),  col_span=1))
+        item_table.add(TableCell(Paragraph(f"${ (tax_amount + sub_total):.2f}", horizontal_alignment=Alignment.RIGHT),  col_span=1))
 
 
         item_table.set_padding_on_all_cells(Decimal(2), Decimal(2), Decimal(4), Decimal(2))  
@@ -210,9 +238,10 @@ if __name__ == "__main__":
     # Test data to fill into the invoice.
     test_items = [BillableItem("Engineering Hours", 40, 60), BillableItem("Consulting fees", 12,120)]
     test_company = Company("XYZ Inc.", "123 Main St, Victoria, BC, Canada", "1-234-567-8910", "billing@xyz.ca", "www.xyz.ca")
-    test_client = Client("ABC Inc.", "321 Secondary St, Victoria, BC, Canada", "1-234-567-8911", "billing@abc.ca", "www.abc.ca")
+    test_client_info = ClientInfo("Bob Smith", "ABC Inc.", "321 Secondary St", "Victoria, BC, V4G 3D6, Canada", "1-234-567-8911")
 
-    document = InvoiceGenerator(test_company, test_client)
+
+    document = InvoiceGenerator(test_company, Client(test_client_info, test_client_info), tax_rate_percent=12)
 
     document.add_image("https://www.ajb-tech.ca/assets/photos/AJB-Tech-Logo-borders-transparent.png")
 
