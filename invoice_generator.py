@@ -21,18 +21,10 @@ from confuse import Configuration
 from argparse import ArgumentParser
 
 # local module imports
+from billable_item import BillableItem
 from client import Client
 from company import Company
 
-
-'''
-Class to describe an item to bill for.
-'''
-@dataclass
-class BillableItem():
-    item_description:str
-    item_quantity: float
-    item_unit_price: float
 
 
 
@@ -43,7 +35,7 @@ EVEN_ROW_TABLE_COLOR = HexColor("FFFFFF")
 
 
 '''
- Main Class to handle creating the Invoice
+Class that generates a PDF invoice from provided data.
 '''
 class InvoiceGenerator():
 
