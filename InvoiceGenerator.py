@@ -9,10 +9,12 @@ from borb.pdf.canvas.layout.table.fixed_column_width_table import FixedColumnWid
 from borb.pdf.canvas.layout.text.paragraph import Paragraph
 from borb.pdf.canvas.layout.layout_element import Alignment
 from borb.pdf.canvas.color.color import HexColor, X11Color
+from borb.pdf.canvas.layout.table.table import TableCell
 
 # General imports
 from datetime import datetime
-
+from dataclasses import dataclass
+from typing import List
 
 # Settings related imports
 from confuse import Configuration
@@ -20,13 +22,36 @@ from argparse import ArgumentParser
 
 # local module imports
 from client import Client
+from company import Company
+
+
+'''
+Class to describe an item to bill for.
+'''
+@dataclass
+class BillableItem():
+    item_description:str
+    item_quantity: float
+    item_unit_price: float
+
+
+
+TOP_ROW_TABLE_COLOR = HexColor("263238")
+ODD_ROW_TABLE_COLOR = HexColor("BBBBBB") 
+EVEN_ROW_TABLE_COLOR = HexColor("FFFFFF") 
+
+
 
 '''
  Main Class to handle creating the Invoice
 '''
 class InvoiceGenerator():
 
-    def __init__(self):
+    def __init__(self, company:Company, client:Client):
+
+        self.company = company
+        self.client = client
+
         # Base Document 
         self.doc = Document()
 
@@ -59,24 +84,24 @@ class InvoiceGenerator():
 
         header = Table(number_of_rows=5, number_of_columns=3)
 	
-        header.add(Paragraph("[Street Address]"))    
+        header.add(Paragraph(f"{self.company.name}"))    
         header.add(Paragraph("Date:        ", font="Helvetica-Bold",respect_spaces_in_text=True,  horizontal_alignment=Alignment.RIGHT))    
         now = datetime.now()    
         header.add(Paragraph("%d/%d/%d" % (now.day, now.month, now.year)))
         
-        header.add(Paragraph("[City, State, ZIP Code]"))    
+        header.add(Paragraph(f"{self.company.address}"))    
         header.add(Paragraph("Invoice #:", font="Helvetica-Bold", horizontal_alignment=Alignment.RIGHT))
         header.add(Paragraph("%d" % 1))   
         
-        header.add(Paragraph("[Phone]"))    
+        header.add(Paragraph(f"{self.company.phone}"))    
         header.add(Paragraph("Due Date:", font="Helvetica-Bold", horizontal_alignment=Alignment.RIGHT))
         header.add(Paragraph("%d/%d/%d" % (now.day, now.month, now.year))) 
         
-        header.add(Paragraph("[Email Address]"))    
+        header.add(Paragraph(f"{self.company.email}"))    
         header.add(Paragraph(" "))
         header.add(Paragraph(" "))
 
-        header.add(Paragraph("[Company Website]"))
+        header.add(Paragraph(f"{self.company.website}"))
         header.add(Paragraph(" "))
         header.add(Paragraph(" "))
 
@@ -116,9 +141,59 @@ class InvoiceGenerator():
         info.no_borders()  
         return info
 
-    def build_items(self):
-        pass
+    # Builds the table of billable items.
+    def build_items(self, items_to_bill: List[BillableItem]):
+        
+        sub_total = 0
+        item_table = Table(number_of_rows=14, number_of_columns=4)  
+        
+        # Builds the Table header. Dark Background with white text.
+        for heading in ["DESCRIPTION", "QTY", "UNIT PRICE", "AMOUNT"]:
+            item_table.add( TableCell( Paragraph(heading, font_color=X11Color("White")), background_color=TOP_ROW_TABLE_COLOR))     
+                
 
+        # Build the items content. 
+        for i in range(0, 10):
+
+            # Odd and even rows will alternate background.
+            row_color = EVEN_ROW_TABLE_COLOR if (i % 2) else ODD_ROW_TABLE_COLOR
+
+            if i < len(items_to_bill):
+                # Item Description
+                item_table.add(TableCell(Paragraph(items_to_bill[i].item_description), background_color=row_color))
+                # Item Quantity
+                item_table.add(TableCell(Paragraph(str(items_to_bill[i].item_quantity)), background_color=row_color))
+                # Unit Price
+                item_table.add(TableCell(Paragraph(f"${items_to_bill[i].item_unit_price:.2f}"), background_color=row_color))
+
+                # Total Amount
+                item_amount = items_to_bill[i].item_quantity * items_to_bill[i].item_unit_price
+                sub_total += item_amount
+                item_table.add(TableCell(Paragraph(f"${item_amount}"), background_color=row_color))
+            else:
+                # No more items, fill in the rest of the rows
+                for _ in range(0, 4):
+                    item_table.add(TableCell(Paragraph(" "), background_color=row_color))
+
+        # Build the final total section
+
+        # Sub-total
+        item_table.add(TableCell(Paragraph("Sub-Total", horizontal_alignment=Alignment.RIGHT),  col_span=3))
+        item_table.add(TableCell(Paragraph(f"${sub_total:.2f}", horizontal_alignment=Alignment.RIGHT),  col_span=1))
+
+        # Taxes
+        item_table.add(TableCell(Paragraph("GST (5%)", horizontal_alignment=Alignment.RIGHT),  col_span=3))
+        item_table.add(TableCell(Paragraph(f"${(sub_total * 0.05):.2f}", horizontal_alignment=Alignment.RIGHT),  col_span=1))
+
+        # Total
+        item_table.add(TableCell(Paragraph("Total", horizontal_alignment=Alignment.RIGHT),  col_span=3))
+        item_table.add(TableCell(Paragraph(f"${ ((sub_total * 0.05) + sub_total):.2f}", horizontal_alignment=Alignment.RIGHT),  col_span=1))
+
+
+        item_table.set_padding_on_all_cells(Decimal(2), Decimal(2), Decimal(4), Decimal(2))  
+        item_table.no_borders() 
+
+        return item_table
 
 
 
@@ -140,14 +215,20 @@ def _load_arguments() -> ArgumentParser:
 
 if __name__ == "__main__":
 
+    # Test data to fill into the invoice.
+    test_items = [BillableItem("Engineering Hours", 40, 60), BillableItem("Consulting fees", 12,120)]
+    test_company = Company("XYZ Inc.", "123 Main St, Victoria, BC, Canada", "1-234-567-8910", "billing@xyz.ca", "www.xyz.ca")
+    test_client = Client("ABC Inc.", "321 Secondary St, Victoria, BC, Canada", "1-234-567-8911", "billing@abc.ca", "www.abc.ca")
 
-    document = InvoiceGenerator()
+    document = InvoiceGenerator(test_company, test_client)
 
-    document.add_image("https://picsum.photos/128/128")
+    document.add_image("https://www.ajb-tech.ca/assets/photos/AJB-Tech-Logo-borders-transparent.png")
 
     document.add_table(document.build_header())
     document.add_blank_line()
     document.add_table(document.build_billing_shipping())
+    document.add_blank_line()
+    document.add_table(document.build_items(test_items))
 
     document.generate("output.pdf")
 
