@@ -92,7 +92,7 @@ class InvoiceGenerator:
     # Builds a table with the header information. Does not modify the document.
     def build_header(self) -> Table:
 
-        header = Table(number_of_rows=5, number_of_columns=3)
+        header = Table(number_of_rows=6, number_of_columns=3)
 
         header.add(Paragraph(f"{self.company.name}"))
         header.add(
@@ -130,6 +130,11 @@ class InvoiceGenerator:
         header.add(Paragraph(f"{self.company.website}"))
         header.add(Paragraph(" "))
         header.add(Paragraph(" "))
+
+        header.add(Paragraph(f"GST #: {self.company.gst_num}"))
+        header.add(Paragraph(" "))
+        header.add(Paragraph(" "))
+
 
         header.set_padding_on_all_cells(Decimal(2), Decimal(2), Decimal(2), Decimal(2))
         header.no_borders()
@@ -300,7 +305,9 @@ class InvoiceGenerator:
 
     def embed_file(self, file_path):
         with open(file_path, "rt") as file:
-            self.doc.add_embedded_file("file.txt", bytes(file.read(), encoding="latin1"))
+            self.doc.add_embedded_file(
+                "file.txt", bytes(file.read(), encoding="latin1")
+            )
 
 
 # Helper to laod in the arguments from the command line
@@ -328,6 +335,7 @@ if __name__ == "__main__":
         "1-234-567-8910",
         "billing@xyz.ca",
         "www.xyz.ca",
+        "123456789-RT01",
     )
     test_client_info = ClientInfo(
         "Bob Smith",

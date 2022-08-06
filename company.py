@@ -11,3 +11,4 @@ class Company:
     phone:str
     email:str
     website:str
+    gst_num:str
