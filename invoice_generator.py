@@ -1,5 +1,4 @@
 # Borb imports
-from xmlrpc.client import DateTime
 from borb.pdf.document.document import Document
 from borb.pdf.page.page import Page
 from borb.pdf.canvas.layout.page_layout.multi_column_layout import SingleColumnLayout
@@ -45,7 +44,7 @@ class InvoiceGenerator:
         company: Company,
         client: Client,
         invoice_number: int = 1,
-        invoice_date: DateTime = datetime.now(),
+        invoice_date: datetime = datetime.now(),
         invoice_due_period=15,
         tax_rate_percent=5,
     ):
