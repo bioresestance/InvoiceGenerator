@@ -136,3 +136,5 @@ dmypy.json
 *.png
 *.jpg
 *jpeg
+.vscode/settings.json
+*.txt
