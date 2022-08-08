@@ -23,9 +23,9 @@ from confuse import Configuration
 from argparse import ArgumentParser
 
 # local module imports
-from billable_item import BillableItem
-from client import Client, ClientInfo
-from company import Company
+from .billable_item import BillableItem
+from .client import Client, ClientInfo
+from .company import Company
 
 
 TOP_ROW_TABLE_COLOR = HexColor("263238")
