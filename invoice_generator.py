@@ -135,7 +135,6 @@ class InvoiceGenerator:
         header.add(Paragraph(" "))
         header.add(Paragraph(" "))
 
-
         header.set_padding_on_all_cells(Decimal(2), Decimal(2), Decimal(2), Decimal(2))
         header.no_borders()
         return header
@@ -309,6 +308,27 @@ class InvoiceGenerator:
                 "file.txt", bytes(file.read(), encoding="latin1")
             )
 
+    """
+    Creates a default document outline.
+    """
+    def create_default_document(
+        self,
+        billing_items: List[BillableItem],
+        embeded_file=None,
+        image_path=None,
+        output_file_name="file.pdf",
+    ):
+
+        self.add_image(image_path)
+        self.add_table(document.build_header())
+        self.add_blank_line()
+        self.add_table(document.build_billing_shipping())
+        self.add_blank_line()
+        self.add_table(document.build_items(billing_items))
+        if embeded_file != None:
+            self.embed_file("./pay.txt")
+        self.generate(output_file_name)
+
 
 # Helper to laod in the arguments from the command line
 def _load_arguments() -> ArgumentParser:
@@ -351,15 +371,4 @@ if __name__ == "__main__":
         test_company, Client(test_client_info, test_client_info), tax_rate_percent=5
     )
 
-    document.add_image(
-        "https://www.ajb-tech.ca/assets/photos/AJB-Tech-Logo-borders-transparent.png"
-    )
-
-    document.add_table(document.build_header())
-    document.add_blank_line()
-    document.add_table(document.build_billing_shipping())
-    document.add_blank_line()
-    document.add_table(document.build_items(test_items))
-    document.embed_file("./pay.txt")
-
-    document.generate("output.pdf")
+    document.create_default_document(test_items)
