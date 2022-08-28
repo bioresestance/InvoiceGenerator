@@ -19,7 +19,6 @@ from dataclasses import dataclass
 from typing import List
 
 # Settings related imports
-from confuse import Configuration
 from argparse import ArgumentParser
 
 # local module imports
@@ -311,6 +310,7 @@ class InvoiceGenerator:
     """
     Creates a default document outline.
     """
+
     def create_default_document(
         self,
         billing_items: List[BillableItem],
@@ -320,11 +320,11 @@ class InvoiceGenerator:
     ):
 
         self.add_image(image_path)
-        self.add_table(document.build_header())
+        self.add_table(self.build_header())
         self.add_blank_line()
-        self.add_table(document.build_billing_shipping())
+        self.add_table(self.build_billing_shipping())
         self.add_blank_line()
-        self.add_table(document.build_items(billing_items))
+        self.add_table(self.build_items(billing_items))
         if embeded_file != None:
             self.embed_file("./pay.txt")
         self.generate(output_file_name)
